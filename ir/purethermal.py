@@ -4,8 +4,8 @@ import numpy as np
 import cv2, time
 
 # IR camera
-from .libuvc_wrapper import *
-from .utils import ktoc, resize, normalize, crop_telemetry, detect_ir, drop_small_bboxes
+from libuvc_wrapper import *
+from utils import ktoc, resize, normalize, crop_telemetry, detect_ir, drop_small_bboxes
 
 
 def uvc_init(ctx):
@@ -25,7 +25,7 @@ def find_device(ctx, dev):
 def open_device(dev, devh):
     res = libuvc.uvc_open(dev, byref(devh))
     if res < 0:
-        print(f"uvc_open error {res}")
+        print("uvc_open error {}".format(res))
         exit(res)
     else:
         print("device opened!")
@@ -110,7 +110,7 @@ def setup():
 
     res = libuvc.uvc_open(dev, byref(devh))
     if res < 0:
-        print(f"uvc_open error {res}")
+        print("uvc_open error {}".format(res))
         exit(res)
 
     print("device opened!")
@@ -145,7 +145,7 @@ def setup():
 
 
 class IRThread(Thread):
-    def __init__(self, bufsize=2, thr_temp=28):
+    def __init__(self, bufsize=2, thr_temp=0):
         super(IRThread, self).__init__()
 
         self._ctx = POINTER(uvc_context)()
@@ -207,17 +207,29 @@ q = Queue(
 if __name__ == "__main__":
 
     # example usage
-
     ctx = POINTER(uvc_context)()
     dev = POINTER(uvc_device)()
     devh = POINTER(uvc_device_handle)()
 
     p = start_pt2(dev, devh, ctx, q)
-
+    
     try:
-        while True:
+        for i in range (1, 5):
             data = q.get(True, 500)
-            print(ktoc(data))
+            tcnt = len(data)
+            if tcnt == 120:
+                temps= np.sort(ktoc(data))
+                #temps= temps[2:tcnt-2]
+                tcnt = len(temps)
+                tmin = np.min(temps)
+                tmax = np.max(temps)
+                tave = np.mean(temps)
+                tmip = np.percentile(temps, 5)
+                tmep = np.percentile(temps, 50)
+                tmap = np.percentile(temps, 95)
+                print("values: {}, min={}, max={}, ave={}, mid_perc={}, low_5perc={}, high_5perc={}".format(tcnt, tmin, tmax, tave, tmep, tmip, tmap))
+            else:
+                print("too few values: {}".format(tcnt))
     finally:
         libuvc.uvc_stop_streaming(devh)
         libuvc.uvc_unref_device(dev)

@@ -63,7 +63,7 @@ def setup():
 
     res = libuvc.uvc_open(dev, byref(devh))
     if res < 0:
-        print(f"uvc_open error {res}")
+        print("uvc_open error {}".format(res))
         exit(res)
 
     print("device opened!")
@@ -95,20 +95,45 @@ def setup():
 
     return ctx, dev, devh, ctrl
 
-if __name__ == "__main__":
+def filterTempArray(temp_arr, t_thres_low=0, t_thres_high=50):
+    filter_arr = []
+    for v in temp_arr:
+        print(v)
+        if v >= t_thres_low and v <= t_thres_high:
+            filter_arr.append(True)
+        else:
+            filter_arr.append(False)
 
+    return temp_arr[filter_arr]
+
+def getTempArray(t_thres_low=0, t_thres_high=50):
     ctx, dev, devh, ctrl = setup()
 
-    while True:
+    for i in range (1, 5):
         data = q.get(True, 500)
-        if data is None:
-            break
-        temp_map = ktoc(data)
-        print(temp_map)
-
+        tcnt = len(data)
+        if tcnt == 120:
+            temps= ktoc(data)
+            temps= filterTempArray(temps, t_thres_low, t_thres_high)
+            #temps= np.sort(temps)[2:tcnt-2]
+            tcnt = len(temps)
+            tmin = np.min(temps)
+            tmax = np.max(temps)
+            tave = np.mean(temps)
+            tmip = np.percentile(temps, 5)
+            tmep = np.percentile(temps, 50)
+            tmap = np.percentile(temps, 95)
+            print("values: {}, min={}, max={}, ave={}, mid_perc={}, low_5perc={}, high_5perc={}".format(tcnt, tmin, tmax, tave, tmep, tmip, tmap))
+        else:
+            print("too few values: {}".format(tcnt))
 
     libuvc.uvc_stop_streaming(devh)
     libuvc.uvc_unref_device(dev)
     libuvc.uvc_exit(ctx)
 
 
+
+
+if __name__ == "__main__":
+
+    getTempArray(5,45)
